@@ -1,0 +1,31 @@
+.footer{
+    background-color: #9ad19a;
+    height:175px;
+    display:grid;
+    grid-template-columns: repeat(3, auto);  
+    grid-gap:2rem;
+    width:100%;
+    top:30px;
+    padding-top: 30px;
+    color:black;
+    list-style: none;
+}
+.navfooter{
+list-style: none;
+font-size:16px;
+}
+.nav-links{
+font-size: 24px;
+text-decoration: none;
+color:black;
+margin:0 0 1rem 0;   
+}
+.nav-links:visited{
+    text-decoration: none;
+    color:black;
+}
+.social{
+    display:flex;
+    list-style: none;
+    gap: 50px;
+}

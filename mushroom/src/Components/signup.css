@@ -1,0 +1,31 @@
+
+.form{
+display:flex;
+margin:16px;
+gap:10px;
+}
+.email{
+    padding: px;
+    font-size: 16px;
+    border-width: 2px;
+    border-color: #CCCCCC;
+    background-color: #FFFFFF;
+    color: #000000;
+    border-style: solid;
+    border-radius: 4px;
+}
+.btn {
+    -webkit-border-radius: 28;
+    -moz-border-radius: 28;
+    border-radius: 28px;
+    color: #000000;
+    font-size: 16px;
+    background: #d19ad1;
+    padding: 7px 10px 7px 10px;
+    text-decoration: none;
+  }
+  
+  .btn:hover {
+    background: #d19a9a;
+    text-decoration: none;
+  }

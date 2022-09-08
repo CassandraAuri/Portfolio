@@ -1,0 +1,25 @@
+
+.hero-display{
+  display:flex;
+  flex-direction: row;
+  flex-wrap:nowrap;
+  flex-shrink:3;
+  font-size: large;
+  text-align: left;
+  align-items: center;
+  color:#E1E1E1;
+}
+.hero{
+  height:35rem;
+  width:35rem;
+  padding-right: 5px;
+}
+.hero-text{
+color:#E1E1E1;
+height:150px;
+font-size: 20px;
+padding-left:5px;
+}
+.right{
+height:150px;
+}
