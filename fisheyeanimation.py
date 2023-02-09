@@ -76,7 +76,6 @@ def main():
     array1total, array2total, array3total = [], [], []
 
     def footprintlogic(array, i):
-
         lla_110km = asilib.lla2footprint(array, 110)
         sat_azel, sat_azel_pixels = asilib.lla2azel(
             asi_array_code, location_code, time_range[0], lla_110km)
