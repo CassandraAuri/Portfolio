@@ -3,9 +3,11 @@ from viresclient import SwarmRequest
 import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
-import datetime as dt
+from datetime import datetime, timedelta
 from tqdm.notebook import tqdm
 import mplcyberpunk
+from MFA import MFA
+import navpy
 set_token("https://vires.services/ows", set_default=True,
           token="kmxv5mTTyYwzw4kQ9lsCkGfQHtjjJRVZ")  # key
 
@@ -15,22 +17,25 @@ fig, axes = plt.subplots(nrows=3,
                          figsize=(10, 6), sharex=True, sharey=False
                          )
 
-start_time = dt.datetime(2021, 3, 18, 8, 13)
-end_time = dt.datetime(2021, 3, 18, 8, 22)  # start and end time
+time_range = (datetime(2021, 3, 18, 8, 11),
+              datetime(2021, 3, 18, 8, 25))
+minutes = int((time_range[1] - time_range[0]
+               ).total_seconds() / 60)  # 3 second␣
+print(minutes)
 
 labels = ["Swarm A", "Swarm B", "Swarm C"]
 measurements = ["B_NEC", "Ehx"]
 
 
 collectionE = [
-    "SW_EXPT_EFIA_TCT02",
-    "SW_EXPT_EFIB_TCT02",
-    "SW_EXPT_EFIC_TCT02",
+    "SW_EXPT_EFIA_TCT16",
+    "SW_EXPT_EFIB_TCT16",
+    "SW_EXPT_EFIC_TCT16",
 ]
 collectionB = [
-    ["SW_OPER_MAGA_LR_1B", "SW_OPER_MAGA_HR_1B"],
-    ["SW_OPER_MAGB_LR_1B", "SW_OPER_MAGB_HR_1B"],
-    ["SW_OPER_MAGC_LR_1B", "SW_OPER_MAGC_HR_1B"]
+    "SW_OPER_MAGA_HR_1B",
+    "SW_OPER_MAGB_HR_1B",
+    "SW_OPER_MAGC_HR_1B"
 ]
 collectionF = [
     "SW_OPER_FACATMS_2F",
@@ -44,7 +49,7 @@ def requester(sc_collection, measurement, **kwargs):
         request.set_collection(sc_collection)
         request.set_products(measurements=measurement, models="CHAOS")
 
-        data = request.get_between(start_time, end_time, **kwargs)
+        data = request.get_between(time_range[0], time_range[1], **kwargs)
         df = data.as_dataframe()
     except:
         df = []
@@ -54,16 +59,16 @@ def requester(sc_collection, measurement, **kwargs):
 def graphingB(index, arrayx, arrayy):
     color = ['gold', 'cyan', 'deeppink', "red"]
     axes[0].plot(arrayx, arrayy,
-                 color=color[index], label="B_E, "+labels[index])
-    axes[0].legend()
-    axes[0].set_ylabel(r"$\Delta$  $B_{E}$ (nT)")
+                 color=color[index], label=r"$B_Y$" + ", "+labels[index])
+    axes[0].legend(loc=2)
+    axes[0].set_ylabel(r"$\Delta$  $B_{Y}$ (nT)")
 
 
 def graphingF(index, arrayx, arrayy):
     color = ['gold', 'cyan', 'deeppink', "red"]
     axes[2].plot(arrayx, arrayy,
                  color=color[index], label="FAC, "+labels[index])
-    axes[2].legend()
+    axes[2].legend(loc=2)
     axes[2].set_ylabel("FAI Intensity (kR)")
 
 
@@ -71,54 +76,84 @@ def graphingE(index, dataset, arrayx, arrayy):
     color = ['gold', 'cyan', 'deeppink', "red"]
     axes[1].plot(arrayx, arrayy,
                  color=color[index], label=dataset+","+labels[index])
-    axes[1].set_ylabel(r"$E_{N}$ (mV/m)$")
-    axes[1].legend()
+    axes[1].set_ylabel(r"$E_{N}$ $(mV/m)$")
+    axes[1].legend(loc=2)
+
+
+def Convert_to_MFA(lattiude, longitude, radius, data, length):  # location vector, data vector,
+    def Coordinate_change():
+        a, b, e2 = 6378137.0, 6356752.3142, 0.00669437999014
+        lat, lon, h = lattiude, longitude, radius
+        v = a/np.sqrt(1-e2*np.sin(lat)*np.sin(lat))
+        x = (v+h)*np.cos(lat)*np.cos(lon)
+        y = (v+h)*np.cos(lat)*np.sin(lon)
+        z = (v*(1-e2)+h)*np.sin(lat)
+        return [x, y, z]
+
+    locationNEC = Coordinate_change()
+    print(locationNEC)
+    mfa = np.zeros(length)
+    datamfa = []
+    for i in range(length):
+        dataselected = np.zeros((60, 3))
+        locationselected = np.zeros((60, 3))
+        for j in range(60):  # index [(i+1)*j]
+            dataselected[j] = data[(i+1)*j]
+            for k in range(3):
+                locationselected[k] = locationNEC[k][(i+1)*j]
+        # Gives the average of the column values
+        xmean = np.average(dataselected, axis=0)
+        datamfa.append(MFA(dataselected, xmean, locationselected))
+    return datamfa
 
 
 def requesterarraylogic():
     def B():
-        def High_resolution_interpolation(time_model, b_model, proper_time):
-            # creates an empty array of proper len, which has less resolution
-            Bmodel_attime = np.zeros(len(proper_time))
-            for i in range(len(proper_time)):
-                Bmodel_attime[i] = (b_model[np.argmin(  # Optimization, finds the minimum value between the subtraction of the times, then finds the corresponding model B field
-                    np.abs(proper_time[i]-time_model))])
-            return Bmodel_attime
 
         for i in range(len(collectionB)):
             bmodel = []
             b = []
             time = []
-            for k in range(2):
-                ds = requester(
-                    collectionB[i][k], measurements[0], asynchronous=False, show_progress=False)  # Data package level, data/modes, **kwargs
-                if(k == 0):
-                    Ball = ds["B_NEC"]  # data package
-                    # Finds the time which is stored as a row header (ie row name)
-                    time = Ball.index
-                    #time = np.delete(time, -1)
-                    Ball = pd.Series.to_numpy(Ball)  # turns to numpy array
-                    # for i in range(len(Ball))
-                    for j in range(len(Ball[:])):
-                        # flattens array for the Northward data ie 2nd index
-                        b.append(Ball[:][j][1])
-                else:
-                    pass
-                if(k == 1):
-                    Bmodel = ds["B_NEC_CHAOS"]
-                    # print(Bmodel)
-                    time_model = Bmodel.index
-                    Bmodel = pd.Series.to_numpy(Bmodel)  # turns to numpy array
-                    # for i in range(len(Ball))
-                    for j in range(len(Bmodel[:])):
-                        # flattens array for the Northward data ie 2nd index
-                        bmodel.append(Bmodel[:][j][1])
-                    Model = High_resolution_interpolation(
-                        time_model, bmodel, time)
+            # Data package level, data/modes, **kwargs
+            ds = requester(collectionB[i], measurements[0],
+                           asynchronous=False, show_progress=False)
+            print(ds.columns.values)
 
-                else:
-                    pass
-            graphingB(i, time, b-Model)
+            def model():
+                Bmodel = ds["B_NEC_CHAOS"]
+                time_model = Bmodel.index
+                Bmodel = pd.Series.to_numpy(Bmodel)  # turns to numpy array
+                # for i in range(len(Ball))
+                for j in range(len(Bmodel[:])):
+                    # flattens array for the Northward data ie 2nd index
+                    bmodel.append(Bmodel[:][j][1])
+                print(time_model)
+                print("pog")
+
+                def mfa_logic():
+                    print("test")
+                print(len(time_model), len(time))
+                return bmodel
+            #bmodel = model()
+            radius, lattiude, longitude = ds["Radius"].array, ds['Latitude'].array, ds['Longitude'].array
+            Bdata = ds["B_NEC"]  # data package
+            # Finds the time which is stored as a row header (ie row name)
+            time = Bdata.index
+            #time = np.delete(time, -1)
+            b = Bdata.array
+            # since minutes only, could start half way nbetween a measurement
+
+            print(b[-1])
+            while(time.size/60 != float(int(time.size/60))):
+                time = time.delete(-1)
+                b = np.delete(b, -1, 0)
+                lattiude = np.delete(lattiude, -1, 0)
+                longitude = np.delete(longitude, -1, 0)
+                radius = np.delete(radius, -1, 0)
+            datamfa = Convert_to_MFA(
+                lattiude, longitude, radius, b, int(time.size/60))
+
+            graphingB(i, time, datamfa)
 
     def E():
         lens = len(collectionE)*2
