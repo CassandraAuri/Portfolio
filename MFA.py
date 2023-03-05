@@ -12,6 +12,10 @@ def MFA(X, meanX, U):  # Transforms X, meanX, and the position vector of the sal
     print(bmean)
     xmfa_unitary[:, :, 2] = bmean/meanX
     print(xmfa_unitary[:, :, 2])
+    print(len(np.squeeze(np.asarray(xmfa_unitary[:, :, 2]))))
+    print("ree")
+    print(len(X))
+    print("what the")
     Xmfa[2] = np.dot(np.squeeze(np.asarray(X)),
                      np.squeeze(np.asarray(xmfa_unitary[:, :, 2])))
 
