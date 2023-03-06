@@ -18,10 +18,10 @@ fig, axes = plt.subplots(nrows=3,
                          )
 
 time_range = (datetime(2021, 3, 18, 8, 11),
-              datetime(2021, 3, 18, 8, 25))
+              datetime(2021, 3, 18, 8, 30))
 minutes = int((time_range[1] - time_range[0]
                ).total_seconds() / 60)  # 3 second␣
-print(minutes)
+cadencefield = 10  # Polling rate for location for EBdata
 
 labels = ["Swarm A", "Swarm B", "Swarm C"]
 measurements = ["B_NEC", "Ehx"]
@@ -91,19 +91,18 @@ def Convert_to_MFA(lattiude, longitude, radius, data, length):  # location vecto
         return [x, y, z]
 
     locationNEC = Coordinate_change()
-    print(locationNEC)
-    mfa = np.zeros(length)
     datamfa = []
     for i in range(length):
-        dataselected = np.zeros((60, 3))
-        locationselected = np.zeros((60, 3))
-        for j in range(60):  # index [(i+1)*j]
+        dataselected = np.zeros((cadencefield, 3))
+        locationselected = np.zeros((cadencefield, 3))
+        for j in range(cadencefield):  # index [(i+1)*j]
             dataselected[j] = data[(i+1)*j]
             for k in range(3):
                 locationselected[k] = locationNEC[k][(i+1)*j]
         # Gives the average of the column values
         xmean = np.average(dataselected, axis=0)
-        datamfa.append(MFA(dataselected, xmean, locationselected))
+        locationmean = np.average(locationselected, axis=0)
+        datamfa.append(MFA(dataselected, xmean, locationmean))
     return datamfa
 
 
@@ -117,7 +116,6 @@ def requesterarraylogic():
             # Data package level, data/modes, **kwargs
             ds = requester(collectionB[i], measurements[0],
                            asynchronous=False, show_progress=False)
-            print(ds.columns.values)
 
             def model():
                 Bmodel = ds["B_NEC_CHAOS"]
@@ -127,12 +125,6 @@ def requesterarraylogic():
                 for j in range(len(Bmodel[:])):
                     # flattens array for the Northward data ie 2nd index
                     bmodel.append(Bmodel[:][j][1])
-                print(time_model)
-                print("pog")
-
-                def mfa_logic():
-                    print("test")
-                print(len(time_model), len(time))
                 return bmodel
             #bmodel = model()
             radius, lattiude, longitude = ds["Radius"].array, ds['Latitude'].array, ds['Longitude'].array
@@ -143,17 +135,20 @@ def requesterarraylogic():
             b = Bdata.array
             # since minutes only, could start half way nbetween a measurement
 
-            print(b[-1])
-            while(time.size/60 != float(int(time.size/60))):
+            while(time.size/cadencefield != float(int(time.size/cadencefield))):
                 time = time.delete(-1)
                 b = np.delete(b, -1, 0)
                 lattiude = np.delete(lattiude, -1, 0)
                 longitude = np.delete(longitude, -1, 0)
                 radius = np.delete(radius, -1, 0)
+            length = int(time.size/cadencefield)
             datamfa = Convert_to_MFA(
-                lattiude, longitude, radius, b, int(time.size/60))
-
-            graphingB(i, time, datamfa)
+                lattiude, longitude, radius, b, length)
+            datamfa = np.reshape(datamfa, (3, length, cadencefield))
+            print(np.shape(datamfa))
+            graphingB(i, time, np.reshape(datamfa[0], -1))
+            graphingB(i, time, np.reshape(datamfa[1], -1))
+            graphingB(i, time, np.reshape(datamfa[2], -1))
 
     def E():
         lens = len(collectionE)*2
