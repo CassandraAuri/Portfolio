@@ -18,10 +18,10 @@ fig, axes = plt.subplots(nrows=3,
                          )
 
 time_range = (datetime(2021, 3, 18, 8, 11),
-              datetime(2021, 3, 18, 8, 30))
+              datetime(2021, 3, 18, 8, 20))
 minutes = int((time_range[1] - time_range[0]
                ).total_seconds() / 60)  # 3 second␣
-cadencefield = 10  # Polling rate for location for EBdata
+cadencefield = 100  # Polling rate for location for EBdata
 
 labels = ["Swarm A", "Swarm B", "Swarm C"]
 measurements = ["B_NEC", "Ehx"]
@@ -101,8 +101,7 @@ def Convert_to_MFA(lattiude, longitude, radius, data, length):  # location vecto
                 locationselected[k] = locationNEC[k][(i+1)*j]
         # Gives the average of the column values
         xmean = np.average(dataselected, axis=0)
-        locationmean = np.average(locationselected, axis=0)
-        datamfa.append(MFA(dataselected, xmean, locationmean))
+        datamfa.append(MFA(dataselected, xmean, locationselected))
     return datamfa
 
 
@@ -146,9 +145,9 @@ def requesterarraylogic():
                 lattiude, longitude, radius, b, length)
             datamfa = np.reshape(datamfa, (3, length, cadencefield))
             print(np.shape(datamfa))
-            graphingB(i, time, np.reshape(datamfa[0], -1))
+            #graphingB(i, time, np.reshape(datamfa[0], -1))
             graphingB(i, time, np.reshape(datamfa[1], -1))
-            graphingB(i, time, np.reshape(datamfa[2], -1))
+            #graphingB(i, time, np.reshape(datamfa[2], -1))
 
     def E():
         lens = len(collectionE)*2
@@ -185,8 +184,8 @@ requesterarraylogic()
 fig.supxlabel("Time (Day:Hour:Minute)")
 fig.suptitle("Time Versus Auroral Parameters From Swarm Spacecraft")
 
-for i in range(len(axes)):  # final touches
-    mplcyberpunk.make_lines_glow(axes[i])  # adds glow to plots
-    # mplcyberpunk.add_gradient_fill(
-    # ax=axes[i], alpha_gradientglow=0.8, gradient_start="zero")
+# for i in range(len(axes)):  # final touches
+# mplcyberpunk.make_lines_glow(axes[i])  # adds glow to plots
+# mplcyberpunk.add_gradient_fill(
+# ax=axes[i], alpha_gradientglow=0.8, gradient_start="zero")
 plt.show()
