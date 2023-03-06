@@ -21,7 +21,7 @@ time_range = (datetime(2021, 3, 18, 8, 11),
               datetime(2021, 3, 18, 8, 20))
 minutes = int((time_range[1] - time_range[0]
                ).total_seconds() / 60)  # 3 second␣
-cadencefield = 100  # Polling rate for location for EBdata
+cadencefield = 1000  # Polling rate for location for EBdata
 
 labels = ["Swarm A", "Swarm B", "Swarm C"]
 measurements = ["B_NEC", "Ehx"]
@@ -144,9 +144,8 @@ def requesterarraylogic():
             datamfa = Convert_to_MFA(
                 lattiude, longitude, radius, b, length)
             datamfa = np.reshape(datamfa, (3, length, cadencefield))
-            print(np.shape(datamfa))
             #graphingB(i, time, np.reshape(datamfa[0], -1))
-            graphingB(i, time, np.reshape(datamfa[1], -1))
+            graphingB(i, time, np.reshape(datamfa[2], -1))
             #graphingB(i, time, np.reshape(datamfa[2], -1))
 
     def E():
