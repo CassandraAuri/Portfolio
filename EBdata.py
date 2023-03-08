@@ -7,7 +7,6 @@ from datetime import datetime, timedelta
 from tqdm.notebook import tqdm
 import mplcyberpunk
 from MFA import MFA
-import navpy
 set_token("https://vires.services/ows", set_default=True,
           token="kmxv5mTTyYwzw4kQ9lsCkGfQHtjjJRVZ")  # key
 
@@ -18,13 +17,11 @@ fig, axes = plt.subplots(nrows=3,
                          )
 
 time_range = (datetime(2021, 3, 18, 8, 11),
-              datetime(2021, 3, 18, 8, 20))
-minutes = int((time_range[1] - time_range[0]
-               ).total_seconds() / 60)  # 3 second␣
-cadencefield = 1000  # Polling rate for location for EBdata
+              datetime(2021, 3, 18, 8, 25)) 
 
-labels = ["Swarm A", "Swarm B", "Swarm C"]
-measurements = ["B_NEC", "Ehx"]
+
+labels = ["Swarm A", "Swarm B", "Swarm C"] #Labels of space-craft interested in
+measurements = ["B_NEC", "Ehx"] #Measurement names from swarm
 
 
 collectionE = [
@@ -40,10 +37,10 @@ collectionB = [
 collectionF = [
     "SW_OPER_FACATMS_2F",
     "SW_OPER_FACBTMS_2F",
-    "SW_OPER_FACCTMS_2F"]
+    "SW_OPER_FACCTMS_2F"] #Data packages from swarm
 
 
-def requester(sc_collection, measurement, **kwargs):
+def requester(sc_collection, measurement, **kwargs): #Requests data from swarm
     try:
         request = SwarmRequest()
         request.set_collection(sc_collection)
@@ -72,81 +69,56 @@ def graphingF(index, arrayx, arrayy):
     axes[2].set_ylabel("FAI Intensity (kR)")
 
 
-def graphingE(index, dataset, arrayx, arrayy):
+def graphingE(index, dataset, arrayx, arrayy): 
     color = ['gold', 'cyan', 'deeppink', "red"]
     axes[1].plot(arrayx, arrayy,
                  color=color[index], label=dataset+","+labels[index])
     axes[1].set_ylabel(r"$E_{N}$ $(mV/m)$")
     axes[1].legend(loc=2)
 
-
-def Convert_to_MFA(lattiude, longitude, radius, data, length):  # location vector, data vector,
-    def Coordinate_change():
-        a, b, e2 = 6378137.0, 6356752.3142, 0.00669437999014
-        lat, lon, h = lattiude, longitude, radius
-        v = a/np.sqrt(1-e2*np.sin(lat)*np.sin(lat))
+def Coordinate_change(lattiude,longitude,radius): #Coordinate change
+        a, b, e2 = 6378137.0, 6356752.3142, 0.00669437999014 #From DRS80
+        lat, lon, h = lattiude, longitude, radius 
+        print(lat)
+        v = a/np.sqrt(1-e2*np.sin(lat)*np.sin(lat)) #logic
         x = (v+h)*np.cos(lat)*np.cos(lon)
         y = (v+h)*np.cos(lat)*np.sin(lon)
         z = (v*(1-e2)+h)*np.sin(lat)
+        print(x)
         return [x, y, z]
-
-    locationNEC = Coordinate_change()
-    datamfa = []
-    for i in range(length):
-        dataselected = np.zeros((cadencefield, 3))
-        locationselected = np.zeros((cadencefield, 3))
-        for j in range(cadencefield):  # index [(i+1)*j]
-            dataselected[j] = data[(i+1)*j]
-            for k in range(3):
-                locationselected[k] = locationNEC[k][(i+1)*j]
-        # Gives the average of the column values
-        xmean = np.average(dataselected, axis=0)
-        datamfa.append(MFA(dataselected, xmean, locationselected))
-    return datamfa
-
 
 def requesterarraylogic():
     def B():
 
-        for i in range(len(collectionB)):
-            bmodel = []
-            b = []
-            time = []
+        for i in range(len(collectionB)): #Goes through every satellite
             # Data package level, data/modes, **kwargs
             ds = requester(collectionB[i], measurements[0],
                            asynchronous=False, show_progress=False)
 
-            def model():
+            def model(): #Gets B field from CHAOS model for Mean-Field
                 Bmodel = ds["B_NEC_CHAOS"]
-                time_model = Bmodel.index
-                Bmodel = pd.Series.to_numpy(Bmodel)  # turns to numpy array
-                # for i in range(len(Ball))
-                for j in range(len(Bmodel[:])):
-                    # flattens array for the Northward data ie 2nd index
-                    bmodel.append(Bmodel[:][j][1])
-                return bmodel
-            #bmodel = model()
-            radius, lattiude, longitude = ds["Radius"].array, ds['Latitude'].array, ds['Longitude'].array
+                return Bmodel.to_numpy()
+            bmodel = model()
+            print(ds["Radius"].to_numpy())
+            radius, lattiude, longitude = ds["Radius"].to_numpy(), ds['Latitude'].to_numpy(), ds['Longitude'].to_numpy() #Gets Emphermis data
             Bdata = ds["B_NEC"]  # data package
             # Finds the time which is stored as a row header (ie row name)
             time = Bdata.index
             #time = np.delete(time, -1)
-            b = Bdata.array
+            b = Bdata.to_numpy()
             # since minutes only, could start half way nbetween a measurement
+            r_nec=Coordinate_change(lattiude,longitude,radius)
+            barranged=np.zeros((len(b),3))
+            bmodelarranged=np.zeros((len(b),3))
+            for j in range(len(b)): #Re-arranges into proper (n x 3 ) matricies, ugly but works
+                for k in range(3):
+                    barranged[j][k]=b[j][k]
+                    bmodelarranged[j][k]=bmodel[i][k]
+            datamfa=MFA(barranged,bmodelarranged, np.asarray(r_nec).T) #Calls MFA with (3xn) vectors
+            graphingB(i, time, datamfa[:,1])
+            #graphingB(i, time, datamfa[:,2])
+            #graphingB(i, time, datamfa[:,0]) #Collects all the compressional B values
 
-            while(time.size/cadencefield != float(int(time.size/cadencefield))):
-                time = time.delete(-1)
-                b = np.delete(b, -1, 0)
-                lattiude = np.delete(lattiude, -1, 0)
-                longitude = np.delete(longitude, -1, 0)
-                radius = np.delete(radius, -1, 0)
-            length = int(time.size/cadencefield)
-            datamfa = Convert_to_MFA(
-                lattiude, longitude, radius, b, length)
-            datamfa = np.reshape(datamfa, (3, length, cadencefield))
-            #graphingB(i, time, np.reshape(datamfa[0], -1))
-            graphingB(i, time, np.reshape(datamfa[2], -1))
-            #graphingB(i, time, np.reshape(datamfa[2], -1))
 
     def E():
         lens = len(collectionE)*2
@@ -183,8 +155,8 @@ requesterarraylogic()
 fig.supxlabel("Time (Day:Hour:Minute)")
 fig.suptitle("Time Versus Auroral Parameters From Swarm Spacecraft")
 
-# for i in range(len(axes)):  # final touches
-# mplcyberpunk.make_lines_glow(axes[i])  # adds glow to plots
+#for i in range(len(axes)):  # final touches
+  #mplcyberpunk.make_lines_glow(axes[i])  # adds glow to plots
 # mplcyberpunk.add_gradient_fill(
 # ax=axes[i], alpha_gradientglow=0.8, gradient_start="zero")
 plt.show()
