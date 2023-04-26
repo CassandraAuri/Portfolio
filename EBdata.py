@@ -16,10 +16,11 @@ fig, axes = plt.subplots(nrows=3,
                          figsize=(10, 6), sharex=True, sharey=False
                          )
 
-time_range = (datetime(2021, 3, 18, 8, 10),
-              datetime(2021, 3, 18, 8, 25))
+time_range = (datetime(2021, 3, 18, 8, 12),
+              datetime(2021, 3, 18, 8, 22))
 
-
+global has_E
+has_E = []  # Sets Which space-craft have a corersponding E field
 # Labels of space-craft interested in
 labels = ["Swarm A", "Swarm B", "Swarm C"]
 # Measurement names from swarm
@@ -94,8 +95,89 @@ def Coordinate_change(lattiude, longitude, radius):  # Coordinate change
 
 
 def requesterarraylogic():
-    def B():
+    def E():
+        return_data = []
 
+        for i in range(len(collectionE)):
+
+            dsE = requester(
+                collectionE[i], measurements[1], False, asynchronous=False, show_progress=False)
+            # B is 50hz but E is 16 so we must do corrections grrr
+
+            if(len(dsE) != 0):
+
+                print(i)
+                # Tells B how many E's there are for ponyting flux,
+                has_E.append(True)
+                print(has_E, "# of e")
+                dsB = requester(
+                    collectionB[i], measurements[0], False, asynchronous=False, show_progress=False)
+                Bdata = dsB["B_NEC"].to_numpy()
+                Btime = dsB.index
+                Bmodel = dsB["B_NEC_CHAOS"]
+
+                def arrangement():
+                    barranged = np.zeros((len(Btime), 3))
+                    bmodelarranged = np.zeros((len(Btime), 3))
+                    # Re-arranges into proper (n x 3 ) matricies, ugly but works
+                    for j in range(len(Btime)):
+                        for k in range(3):
+                            barranged[j][k] = Bdata[j][k]
+                            bmodelarranged[j][k] = Bmodel[j][k]
+                    return barranged, bmodelarranged
+
+                Bdata, Bmodel = arrangement()
+                Velocitytime = dsE.index.to_numpy()
+
+                def Time_corrections(E_time, B_time):
+                    def Bchange(times):
+                        print(times)
+                        nonlocal Bdata, Bmodel
+                        Bdata = Bdata[times]
+                        Bmodel = Bmodel[times]
+
+                    # finds the closest time value for each element in E_time
+                    closest_time = np.zeros(len(E_time), dtype=int)
+                    # resource intesiive, find something better
+
+                    for i in range(len(E_time)):
+                        closest_time[i] = np.argmin(
+                            np.abs(E_time[i]-B_time))
+
+                    Bchange(closest_time)
+                    return closest_time
+                times_of_b_for_flux = Time_corrections(
+                    Velocitytime, dsB.index.to_numpy())
+                Velocity = dsE[measurements[1]].to_numpy()
+                # Via E=-(v cross B)
+                bdata_units, Bmodel_units = np.multiply(
+                    Bdata, 10**(-9)), np.multiply(Bmodel, 10**(-9))
+                Edata = np.divide(
+                    np.cross(Velocity, bdata_units), -1*1.602*10**(-19))  # Gives E in NEC via lorentz force
+                Emodel = np.divide(
+                    np.cross(Velocity, Bmodel_units), -1*1.602*10**(-19))  # Gives E in NEC
+                Bres = np.subtract(Bdata, Bmodel)
+
+                radius, lattiude, longitude = dsE["Radius"].to_numpy(
+                ), dsE['Latitude'].to_numpy(), dsE['Longitude'].to_numpy()  # Gets Emphermis data
+                r_nec = Coordinate_change(lattiude, longitude, radius)
+                datamfa = MFA(Edata, Bres, np.asarray(
+                    r_nec).T)  # Calls MFA with (3xn) vectors
+                modelmfa = MFA(Emodel, Bres, np.asarray(
+                    r_nec).T)
+
+                graphingE(i, dsE.index.to_numpy(), np.subtract(
+                    datamfa[:, 1], modelmfa[:, 1]))
+                return_data.append(np.subtract(
+                    datamfa, modelmfa))
+                returned_times = dsE.index.to_numpy()
+            else:  # Says theres no E component
+                has_E.append(False)
+        print(np.shape(return_data))
+        return return_data, times_of_b_for_flux, returned_times
+
+    def B():
+        return_data = []
         for i in range(len(collectionB)):  # Goes through every satellite
             # Data package level, data/modes, **kwargs
             dsmodel_res = requester(collectionB[i], measurements[0], True,
@@ -132,68 +214,13 @@ def requesterarraylogic():
             graphingB(i, time, np.subtract(datamfa[:, 2], bmodelmfa[:, 2]))
             # graphingB(i, time, datamfa[:,2])
             # graphingB(i, time, datamfa[:,0]) #Collects all the compressional B values
+            # Returns magnetic field for poynting flux if there is a corresponding E field
+            if(has_E[i] == True):
+                return_data.append(np.subtract(datamfa, bmodelmfa))
+                print(return_data)
+                print("bfieldarrays")
 
-    def E():
-        lens = len(collectionE)*2
-        for i in range(len(collectionE)):
-            v = []  # velocities
-            dsE = requester(
-                collectionE[i], measurements[1], False, asynchronous=False, show_progress=False)
-            # B is 50hz but E is 16 so we must do corrections grrr
-
-            if(len(dsE) != 0):
-                dsB = requester(
-                    collectionB[i], measurements[0], False, asynchronous=False, show_progress=False)
-                Bdata = dsB["B_NEC"].to_numpy()
-                Btime = dsB.index
-                Bmodel = dsB["B_NEC_CHAOS"]
-
-                def arrangement():
-                    barranged = np.zeros((len(Btime), 3))
-                    bmodelarranged = np.zeros((len(Btime), 3))
-                    # Re-arranges into proper (n x 3 ) matricies, ugly but works
-                    for j in range(len(Btime)):
-                        for k in range(3):
-                            barranged[j][k] = Bdata[j][k]
-                            bmodelarranged[j][k] = Bmodel[j][k]
-                    return barranged, bmodelarranged
-                Bdata, Bmodel = arrangement()
-                Velocitytime = dsE.index.to_numpy()
-
-                def Time_corrections(E_time, B_time):
-                    def Bchange(times):
-                        print(times)
-                        nonlocal Bdata, Bmodel
-                        Bdata = Bdata[times]
-                        Bmodel = Bmodel[times]
-                    # finds the closest time value for each element in E_time
-                    closest_time = np.zeros(len(E_time), dtype=int)
-                    # resource intesiive, find something better
-                    for i in range(len(E_time)):
-                        closest_time[i] = np.argmin(
-                            np.abs(E_time[i]-B_time))
-
-                    Bchange(closest_time)
-
-                Time_corrections(Velocitytime, dsB.index.to_numpy())
-                Velocity = dsE[measurements[1]].to_numpy()
-                # Via E=-(v cross B)
-                Edata = np.multiply(
-                    np.cross(Velocity, Bdata), -1)  # Gives E in NEC
-                Emodel = np.multiply(
-                    np.cross(Velocity, Bmodel), -1)  # Gives E in NEC
-                Eres = np.subtract(Edata, Emodel)
-
-                radius, lattiude, longitude = dsE["Radius"].to_numpy(
-                ), dsE['Latitude'].to_numpy(), dsE['Longitude'].to_numpy()  # Gets Emphermis data
-                r_nec = Coordinate_change(lattiude, longitude, radius)
-                datamfa = MFA(Edata, Eres, np.asarray(
-                    r_nec).T)  # Calls MFA with (3xn) vectors
-                modelmfa = MFA(Emodel, Eres, np.asarray(
-                    r_nec).T)
-
-                graphingE(i, dsE.index.to_numpy(), np.subtract(
-                    datamfa[:, 2], modelmfa[:, 2]))
+        return np.array(return_data)
 
     def F():
         for i in range(len(collectionF)):
@@ -206,9 +233,39 @@ def requesterarraylogic():
 
             graphingF(i, time, fac)
 
-    B()
-    E()
+    e1, e2, e3 = E()  # E field, indexs of B for time, times for plotting flux
+    efield, times_for_b, time_for_flux = e1, e2, e3
+
+    bfield = B()
+
     F()
+    plt.show()
+    plt.clf()
+
+    def pontying_flux():  # Take rough estimate by doing N cross E to get C poynting flux
+        nonlocal bfield, efield
+        flux = []
+        print(np.shape(bfield[0]))
+        for i in range(len(efield)):  # Sees how many E data points we have
+            bflux = bfield[i]
+            print(bflux)
+            bflux = bflux[times_for_b]
+            print(bflux)
+            print(np.shape(bflux))
+            eflux = efield[i]
+            print(np.shape(eflux), "test")
+            flux = np.cross(eflux, bflux[i])
+            print(np.shape(flux))
+
+            for i in range(3):
+                plt.clf()
+                flux_individual = np.transpose(flux)[i]
+                plt.plot(time_for_flux, flux_individual)
+                plt.show()
+                plt.clf()
+
+    pontying_flux()
+    print("test")
 
 
 requesterarraylogic()
