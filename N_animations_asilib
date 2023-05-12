@@ -168,7 +168,7 @@ def main():
 
     for k in range(len(asi_array_code)):
         ax = gs[k, 0]
-        movie_generator = asilib.animate_fisheye_generator(
+        movie_generator = asilib.animate_fisheye_generator( 
             asi_array_code, location_code, time_range, azel_contours=True, color_map='auto', ax=ax,
         )
 
@@ -176,7 +176,7 @@ def main():
         # brightness along the satellite path and in a (20x20 km) box.
         image_data = movie_generator.send('data')
 
-        for i in range(len(platforms)):  # length of spacecraft
+        for i in range(len(platforms)):  #  # array of space-craft, this whole for loop serves to find the image values of each satellite
             array1total, array2total, array3total = [], [], []
             emphermaisdataforfootprint = np.array(
                 [data[0], data[1][i], data[2][i], data[3]])  # [Time, latitudinal velocity, longitudinal velocity, height] for each spacecraft
