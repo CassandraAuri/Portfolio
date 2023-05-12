@@ -8,13 +8,12 @@ import numpy as np
 import pyaurorax.ephemeris as ae
 import asilib
 
-asi_array_code = ['THEMIS', 'THEMIS']
+asi_array_code = ['REGO', 'REGO']
 location_code = ['GILL', 'FSMI']
 time_range = (datetime(2020, 3, 18, 8, 11),
               datetime(2020, 3, 18, 8, 25))
 area_box_km = (20, 20)
-skymap_dict = asilib.load_skymap(
-    asi_array_code, location_code, time_range[0])
+
 
 global platforms
 platforms = ["swarma", "epop", "swarmb", "swarmc"]
@@ -93,7 +92,7 @@ def emph():
             # for i in range(len(platforms)):
             # for j in range(len(platforms)):
         altitude_array = altitude()
-        return np.array([time, latvelocitytotal, lonvelocitytotal, (len(latvelocitytotal[0])*[500])])
+        return [time, latvelocitytotal, lonvelocitytotal, (len(latvelocitytotal[0])*[500])]
 
     # image_bounds = imager_bounds()
     global em1
@@ -118,7 +117,7 @@ data = emph()  # emphermasis data of platforms selected ie: epop etc
 
 def main():
 
-    def footprintlogic(array, k):  # Finds the footprint of selected region
+    def footprintlogic(array, k):  # Finds the footprint of selected region with each selected spacecraft
 
         lla_110km = asilib.lla2footprint(array, 110)
         sat_azel, sat_azel_pixels = asilib.lla2azel(
@@ -133,64 +132,77 @@ def main():
 
         return sat_azel_pixels, area_box_mask_2, asi_brightness_2
 
-    def animator(array1, array2, array3):
+    
+    
+    def animator(array1, array2, array3): #HAVE NOT CHANGED, need help
         color = ['dodgerblue', 'purple', 'deeppink', "orange"]
         for i, (time, image, _, im) in enumerate(movie_generator):
             # Note that because we are drawing different data in each frame (a unique␣
             # image in ax[0] and the ASI time series + a guide in ax[1], we need
             # to redraw everything at every iteration.
-            ax[1].clear()
+            plt.clf()
             # Plot the entire satellite track, its current location, and a 20x20 km box
             # around its location.
             for j in range(len(array1)):
-                ax[0].scatter(array1[j][i, 0], array1[j][i, 1],
+                ax.scatter(array1[j][i, 0], array1[j][i, 1],
                               c=color[j], marker='o', s=50)
-                ax[0].contour(array2[j][i, :, :],
+                ax.contour(array2[j][i, :, :],
                               levels=[0.99], colors=['yellow'])
             # Plot the time series of the mean ASI intensity along the satellite path
                 # ax[0] cleared by asilib.animate_fisheye_generator()
-                ax[1].axvline(time, c='b')
-                ax[1].plot(image_data.time, array3[j] /
+                ax1.axvline(time, c='b')
+                ax1.plot(image_data.time, array3[j] /
                            1000, color=color[j])
-                ax[1].set(xlabel='Time', ylabel=f'Mean ASI intensity\n [counts $\times␣, →10^3$]',
+                ax1.set(xlabel='Time', ylabel=f'Mean ASI intensity\n [counts $\times␣, →10^3$]',
                           xlim=time_range)
-            ax[1].text(0, 1, s="b", va='top', transform=ax[1].transAxes,
+            ax1.text(0, 1, s="b", va='top', transform=ax[1].transAxes,
                        color='black', fontsize=20)
             # Annotate the location_code and satellite info in the top-left corner.
-            ax[0].text(0, 1, '(a)', va='top', transform=ax[0].transAxes,
+            ax.text(0, 1, '(a)', va='top', transform=ax[0].transAxes,
                        color='white', fontsize=20)
-
+    
+    
+    
+    
     fig = plt.figure(
         figsize=(7, 8.5)
     )
 
-    gs = fig.add_gridspec(3, 2)
-
+    gs = fig.add_gridspec(2, 2)
+    ax1 = gs[:, 1]
+    
+    
+    
     for k in range(len(asi_array_code)):
         ax = gs[k, 0]
-        movie_generator = asilib.animate_fisheye_generator( 
-            asi_array_code, location_code, time_range, azel_contours=True, color_map='auto', ax=ax,
+        movie_generator = asilib.animate_fisheye_generator(
+            asi_array_code[k], location_code[k], time_range, azel_contours=True, color_map='auto', ax=ax,
         )
 
         # Use the generator to get the images and time stamps to estimate mean the ASI
         # brightness along the satellite path and in a (20x20 km) box.
         image_data = movie_generator.send('data')
 
-        for i in range(len(platforms)):  #  # array of space-craft, this whole for loop serves to find the image values of each satellite
-            array1total, array2total, array3total = [], [], []
+        for i in range(len(platforms)):  # length of spacecraft
+            sat_azel_pixels_total, area_box_mask_2_total, asi_brightness_2_total = [], [], []
+            
             emphermaisdataforfootprint = np.array(
-                [data[0], data[1][i], data[2][i], data[3]])  # [Time, latitudinal velocity, longitudinal velocity, height] for each spacecraft
-            array1, array2, array3 = footprintlogic(
+                [data[0], data[1][i], data[2][i], data[3]]) 
+            # [Time, latitudinal velocity, longitudinal velocity, height] for each spacecraft for emph()
+            
+            sat_azel_pixels, area_box_mask_2, asi_brightness_2 = footprintlogic(
                 emphermaisdataforfootprint, k)  # sat_azel_pixels, area_box_mask_2, asi_brightness_2
-            array1total.append(array1)
-            array2total.append(array2)
-            array3total.append(array3)
+            
+            sat_azel_pixels_total.append(sat_azel_pixels)
+            area_box_mask_2_total.append(area_box_mask_2)
+            asi_brightness_2_total.append(asi_brightness_2)
         # sat_azel_pixels, area_box_mask_2, asi_brightness_2 for each satellite
-        animator(array1total, array2total, array3total, k)
+    animator(sat_azel_pixels_total, area_box_mask_2_total,
+                 asi_brightness_2_total)
 
-        plt.subplots_adjust(wspace=0, hspace=0, right=0.98,
-                            left=0.12, bottom=0.05, top=0.99)
-        print(f'Movie saved in {asilib.config["ASI_DATA_DIR"] / "animations"}')
+    plt.subplots_adjust(wspace=0, hspace=0, right=0.98,
+                        left=0.12, bottom=0.05, top=0.99)
+    print(f'Movie saved in {asilib.config["ASI_DATA_DIR"] / "animations"}')
 
 
 main()
