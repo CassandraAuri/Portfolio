@@ -142,26 +142,24 @@ def main(dict, data):
             for i, (time, image, _, im) in enumerate(movie_generator):
                 # Plot the entire satellite track, its current location, and a 20x20 km box
                 # around its location.
+                ax[1].clear()
+                ax[2].clear()
                 for j in range(len(sat_azel_pixels_total)):
                     ax[0].plot(sat_azel_pixels_total[j][:, 0],
-                               sat_azel_pixels_total[j][:, 1], 'red')
+                            sat_azel_pixels_total[j][:, 1], 'blue')
                     ax[0].scatter(sat_azel_pixels_total[j][i, 0], sat_azel_pixels_total[j][i, 1],
-                                  c='red', marker='o', s=50)
+                                c='red', marker='o', s=50)
                     ax[0].contour(area_mask_total[j][i, :, :],
-                                  levels=[0.99], colors=['yellow'])
+                                levels=[0.99], colors=['yellow'])
 
-                    if 'vline1' in locals():
-                        vline1.remove()  # noqa: F821
-                        vline2.remove()  # noqa: F821
-                        text_obj.remove()  # noqa: F821
-                    else:
-                        # Plot the ASI intensity along the satellite path
-                        ax[1].plot(sat_time, nearest_pixel_intensity_total[j])
-                        ax[2].plot(sat_time, area_intensity_total[j])
-                    vline1 = ax[1].axvline(time, c='b')
-                    vline2 = ax[2].axvline(time, c='b')
+                    ax[1].plot(sat_time, nearest_pixel_intensity_total[j])
+                    ax[2].plot(sat_time, area_intensity_total[j])
 
-                    # Annotate the location_code and satellite info in the top-left corner.
+                    # Plot the ASI intensity along the satellite path
+                vline1 = ax[1].axvline(time, c='b')
+                vline2 = ax[2].axvline(time, c='b')
+
+                # Annotate the location_code and satellite info in the top-left corner.
                 location_code_str = (
                     f'{asi_array_code}/{location_code} '
                     f'LLA=({asi.meta["lat"]:.2f}, '
@@ -177,10 +175,10 @@ def main(dict, data):
                 )
                 ax[1].set(ylabel='ASI intensity\nnearest pixel [counts]')
                 ax[2].set(xlabel='Time',
-                          ylabel='ASI intensity\n10x10 km area [counts]')
+                        ylabel='ASI intensity\n10x10 km area [counts]')
 
         fig, ax = plt.subplots(
-            2, 1, figsize=(15, 10), gridspec_kw={'height_ratios': [4, 1]}
+            3, 1, figsize=(7, 10), gridspec_kw={'height_ratios': [4, 1, 1]}, constrained_layout=True
         )
         for k in range(len(dict["sky_map_values"])):
             sat_azel_pixels_total, area_box_mask_2_total, asi_brightness_2_total = [], [], []
