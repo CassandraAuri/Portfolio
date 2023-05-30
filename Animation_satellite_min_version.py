@@ -7,8 +7,7 @@ import matplotlib.gridspec
 import numpy as np
 import pyaurorax.ephemeris as ae
 import asilib
-asi_array_code = 'TREX'
-location_code = 'rabb'
+
 time_range = (datetime(2021, 3, 18, 8, 10),
               datetime(2021, 3, 18, 8, 30))
 
