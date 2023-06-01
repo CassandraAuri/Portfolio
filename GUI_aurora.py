@@ -9,6 +9,7 @@ import matplotlib.animation as animation
 from moviepy.editor import VideoFileClip, concatenate_videoclips, clips_array
 from datetime import datetime, timedelta, date, time
 import asilib
+import asilib.asi
 
 
 st.title("Date and conjunction time")
@@ -16,7 +17,7 @@ st.title("Date and conjunction time")
 
 def Animation(timerange):
     def graphing_animation(dict, data):
-        
+
         time_range = dict["time_range"]
         platforms = dict["satellite_graph"]
         save_file = []
@@ -32,11 +33,11 @@ def Animation(timerange):
                 ax[2].clear()
                 for j in range(len(sat_azel_pixels_total)):
                     ax[0].plot(sat_azel_pixels_total[j][:, 0],
-                            sat_azel_pixels_total[j][:, 1], 'blue')
+                               sat_azel_pixels_total[j][:, 1], 'blue')
                     ax[0].scatter(sat_azel_pixels_total[j][i, 0], sat_azel_pixels_total[j][i, 1],
-                                c='red', marker='o', s=50)
+                                  c='red', marker='o', s=50)
                     ax[0].contour(area_mask_total[j][i, :, :],
-                                levels=[0.99], colors=['yellow'])
+                                  levels=[0.99], colors=['yellow'])
 
                     ax[1].plot(sat_time, nearest_pixel_intensity_total[j])
                     ax[2].plot(sat_time, area_intensity_total[j])
@@ -61,28 +62,31 @@ def Animation(timerange):
                 )
                 ax[1].set(ylabel='ASI intensity\nnearest pixel [counts]')
                 ax[2].set(xlabel='Time',
-                        ylabel='ASI intensity\n10x10 km area [counts]')
+                          ylabel='ASI intensity\n10x10 km area [counts]')
 
         fig, ax = plt.subplots(
-        3, 1, figsize=(7, 10), gridspec_kw={'height_ratios': [4, 1, 1]}, constrained_layout=True
+            3, 1, figsize=(7, 10), gridspec_kw={'height_ratios': [4, 1, 1]}, constrained_layout=True
         )
         for k in range(len(dict["sky_map_values"])):  # Make function REFACTOR
-            sat_azel_pixels_total, area_box_mask_2_total, asi_brightness_2_total = [], [], []
             asi_array_code = dict["sky_map_values"][k][0]
             location_code = dict["sky_map_values"][k][1]
-            alt = 110
-            if(asi_array_code.lower() == 'themis'):
-                asi = asilib.themis(
-                    location_code, time_range=time_range, alt=alt)
-            elif(asi_array_code.lower() == 'rego'):
-                asi = asilib.rego(
-                    location_code, time_range=time_range, alt=alt)
-                print("test")
-            elif(asi_array_code.lower() == 'trex'):
-                asi = asilib.trex_nir(
-                    location_code, time_range=time_range, alt=alt)
-            else:
-                assert "error in asi_code"
+
+            def ASI_logic():
+
+                alt = 110  # footprint value
+                if(asi_array_code.lower() == 'themis'):
+                    asi = asilib.asi.themis(
+                        location_code, time_range=time_range, alt=alt)
+                elif(asi_array_code.lower() == 'rego'):
+                    asi = asilib.asi.rego(
+                        location_code, time_range=time_range, alt=alt)
+                    print("test")
+                elif(asi_array_code.lower() == 'trex_nir'):
+                    asi = asilib.asi.trex.trex_nir(
+                        location_code, time_range=time_range, alt=alt)
+                return asi
+            asi = ASI_logic()
+
         # Initiate the movie generator function. Any errors with the data will be␣
 
             movie_generator = asi.animate_fisheye_gen(
@@ -90,6 +94,7 @@ def Animation(timerange):
             )
             # Use the generator to get the images and time stamps to estimate mean the ASI
             # brightness along the satellite path and in a (20x20 km) box.
+            alt = 110
             sat_lla_total, sat_azel_pixels_total, nearest_pixel_intensity_total, area_intensity_total, area_mask_total = [], [], [], [], []
             for i in range(len(platforms)):  # length of spacecraft REFACTOR
 
@@ -156,7 +161,7 @@ def Animation(timerange):
                     if "".join([str(i), "site"]) not in st.session_state:
                         st.session_state["".join([str(i), "site"])] = []
                     with col[i]:  # each column
-                        st.multiselect("Name of Project", ["REGO", "THEMIS"],  key="".join(
+                        st.multiselect("Name of Project", ["REGO", "THEMIS", "trex_nir"],  key="".join(
                             [str(i), "project"]), max_selections=1)  # Sets the project
 
                         # if no project, do not execute site parameters
@@ -169,7 +174,10 @@ def Animation(timerange):
                         # if project is themis, select themis site
                             if(st.session_state["".join([str(i), "project"])][0] == "THEMIS"):
                                 st.multiselect("Name of Site", [
-                                    "FSMI", "GILL", "RESU"], key="".join([str(i), "site"]), max_selections=1)
+                                    "FSMI", "GILL", "FSIM"], key="".join([str(i), "site"]), max_selections=1)
+                            if(st.session_state["".join([str(i), "project"])][0] == "trex_nir"):
+                                st.multiselect("Name of Site", [
+                                    "rabb"], key="".join([str(i), "site"]), max_selections=1)
 
                         else:
                             pass
@@ -431,9 +439,3 @@ def Main():
 
 if __name__ == '__main__':
     Main()
-
-
-# fig=EBplots()
-
-
-# st.pyplot(fig)
