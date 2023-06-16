@@ -7,17 +7,20 @@ from MFA_EB import EBplotsMFA
 from Animation_GUI import emph
 import matplotlib.animation as animation
 from moviepy.editor import VideoFileClip, concatenate_videoclips, clips_array
+import moviepy
 from datetime import datetime, timedelta, date, time
 import asilib
 import asilib.asi
-
+import mplcyberpunk
+plt.style.use("cyberpunk")
 
 st.title("Date and conjunction time")
 
 
 def Animation(timerange):
-    def graphing_animation(dict, data):
+    def graphing_animation(dict):
 
+        data_3, data_6 = emph(dict, 3), emph(dict, 6)
         time_range = dict["time_range"]
         platforms = dict["satellite_graph"]
         save_file = []
@@ -29,13 +32,14 @@ def Animation(timerange):
             for i, (time, image, _, im) in enumerate(movie_generator):
                 # Plot the entire satellite track, its current location, and a 20x20 km box
                 # around its location.
+
                 ax[1].clear()
                 ax[2].clear()
                 for j in range(len(sat_azel_pixels_total)):
                     ax[0].plot(sat_azel_pixels_total[j][:, 0],
                                sat_azel_pixels_total[j][:, 1], 'blue')
                     ax[0].scatter(sat_azel_pixels_total[j][i, 0], sat_azel_pixels_total[j][i, 1],
-                                  c='red', marker='o', s=50)
+                                  marker='o', s=50)
                     ax[0].contour(area_mask_total[j][i, :, :],
                                   levels=[0.99], colors=['yellow'])
 
@@ -63,11 +67,13 @@ def Animation(timerange):
                 ax[1].set(ylabel='ASI intensity\nnearest pixel [counts]')
                 ax[2].set(xlabel='Time',
                           ylabel='ASI intensity\n10x10 km area [counts]')
-
-        fig, ax = plt.subplots(
-            3, 1, figsize=(7, 10), gridspec_kw={'height_ratios': [4, 1, 1]}, constrained_layout=True
+                ax[1].set_xlim(time_range[0], time_range[1])
+                ax[2].set_xlim(time_range[0], time_range[1])
+        fig, ax = plt.subplots(  # intializes plots
+            3, 1,  figsize=(15, 10), gridspec_kw={'height_ratios': [4, 1, 1]}, constrained_layout=True
         )
-        for k in range(len(dict["sky_map_values"])):  # Make function REFACTOR
+        # Loops through the number of stations selected by the user
+        for k in range(len(dict["sky_map_values"])):
             asi_array_code = dict["sky_map_values"][k][0]
             location_code = dict["sky_map_values"][k][1]
 
@@ -75,32 +81,46 @@ def Animation(timerange):
 
                 alt = 110  # footprint value
                 if(asi_array_code.lower() == 'themis'):
+                    frame_rate = 10
                     asi = asilib.asi.themis(
                         location_code, time_range=time_range, alt=alt)
+                    movie_generator = asi.animate_fisheye_gen(  # initaliziation
+                        ax=ax[0], azel_contours=True, overwrite=True, cardinal_directions='NE', ffmpeg_params={'framerate': frame_rate})
                 elif(asi_array_code.lower() == 'rego'):
+                    frame_rate = 10
                     asi = asilib.asi.rego(
                         location_code, time_range=time_range, alt=alt)
+                    movie_generator = asi.animate_fisheye_gen(  # initaliziation
+                        ax=ax[0], azel_contours=True, overwrite=True, cardinal_directions='NE', color_bounds=[300, 550], ffmpeg_params={'framerate': frame_rate})
                     print("test")
                 elif(asi_array_code.lower() == 'trex_nir'):
+                    frame_rate = 5
                     asi = asilib.asi.trex.trex_nir(
                         location_code, time_range=time_range, alt=alt)
-                return asi
-            asi = ASI_logic()
+                    movie_generator = asi.animate_fisheye_gen(  # initaliziation
+                        ax=ax[0], azel_contours=True, overwrite=True, cardinal_directions='NE', color_bounds=[400, 700], ffmpeg_params={'framerate': frame_rate})
+                return asi, movie_generator
+            asi, movie_generator = ASI_logic()
 
         # Initiate the movie generator function. Any errors with the data will be␣
 
-            movie_generator = asi.animate_fisheye_gen(
-                ax=ax[0], azel_contours=True, overwrite=True, cardinal_directions='NE'
-            )
             # Use the generator to get the images and time stamps to estimate mean the ASI
             # brightness along the satellite path and in a (20x20 km) box.
             alt = 110
             sat_lla_total, sat_azel_pixels_total, nearest_pixel_intensity_total, area_intensity_total, area_mask_total = [], [], [], [], []
             for i in range(len(platforms)):  # length of spacecraft REFACTOR
 
-                sat_time = data[0]
+                # Trex is 6 second cadence compared to 3 of rego and themos
+                if(asi_array_code.lower() == 'trex_nir'):
+                    data = data_6
+                else:
+                    data = data_3
+
+                sat_time = data[0]  # sets timestamp
+                print(len(data[1][i]), len(data[3][i]))
                 sat_lla = np.array(
-                    [data[1][i], data[2][i], alt * np.ones(len(data[1][i]))]).T
+                    [data[1][i], data[2][i], data[3][i]]).T
+
                 conjunction_obj = asilib.Conjunction(
                     asi, (sat_time, sat_lla))
 
@@ -111,7 +131,8 @@ def Animation(timerange):
                 # image pixels. NOTE: the mapping is not along the magnetic field lines! You need
                 # to install IRBEM and then use conjunction.lla_footprint() before
                 # calling conjunction_obj.map_azel.
-                sat_azel, sat_azel_pixels = conjunction_obj.map_azel()
+                conjunction_obj.lla_footprint(map_alt=110)
+                sat_azel, sat_azel_pixels = conjunction_obj.map_azel()  # See ASILIB documentation
                 print(__name__)
                 nearest_pixel_intensity = conjunction_obj.intensity(
                     box=None)
@@ -135,11 +156,12 @@ def Animation(timerange):
             movie_container = 'mp4'
             movie_address = f'{time_range[0].strftime("%Y%m%d_%H%M%S")}_' \
                 f'{time_range[1].strftime("%H%M%S")}_' \
-                f'{asi_array_code.lower()}_{location_code.lower()}_fisheye.{movie_container}'
+                f'{asi_array_code.lower()}_{location_code.lower()}_fisheye.{movie_container}'  # file address of movie saved by asilib
 
             movie_address_total = asilib.config["ASI_DATA_DIR"] / \
-                'animations'/movie_address
+                'animations'/movie_address  # full address from C:
             print(movie_address_total)
+            # Saves address so movie.py can load it in the GUI
             save_file.append(movie_address_total)
         return save_file
 
@@ -151,8 +173,9 @@ def Animation(timerange):
         def station_logic():
 
             count = station_count
-            col = st.columns(count)
+            col = st.columns(count)  # number of columns selected
             # numpy doesnt have string arrays, only character arrays
+            # initializes empty array for columns selected
             values = [[None, None]]*count
 
             def station_GUI():
@@ -177,7 +200,7 @@ def Animation(timerange):
                                     "FSMI", "GILL", "FSIM"], key="".join([str(i), "site"]), max_selections=1)
                             if(st.session_state["".join([str(i), "project"])][0] == "trex_nir"):
                                 st.multiselect("Name of Site", [
-                                    "rabb"], key="".join([str(i), "site"]), max_selections=1)
+                                    "rabb", "gill"], key="".join([str(i), "site"]), max_selections=1)
 
                         else:
                             pass
@@ -238,8 +261,7 @@ def Animation(timerange):
                 lin_ani.save('animation.mp4', writer=FFwriter)
                 print('success')
 
-            data = emph(Animation_dict)
-            animation_strings = graphing_animation(Animation_dict, data)
+            animation_strings = graphing_animation(Animation_dict)
             print(animation_strings)
 
             try:
@@ -280,7 +302,7 @@ def Animation(timerange):
                 else:
                     combined = clips_array(
                         [[clip1, clip2], [clip3, clip4], [clip_graph, clip_graph]])
-
+            print(combined, clip1, clip2, clip3, clip4)
             combined.write_videofile("animation_display.mp4")
             st.video("animation_display.mp4")
             st.session_state['Animation_logic_completed'] = True
@@ -291,7 +313,6 @@ def Animation(timerange):
             label="Render graphs", key="Animation_executer")
         if(button_for_animation == True):
             Animation_function_caller()
-            print("ree-fuck-this-shitbag-fucking-hell-scape")
     Animation_GUI()
 
 
@@ -397,9 +418,8 @@ def Render_Graph(timerange):
         st.session_state["Graph"] = figaxes
 
     if(dict["coordinate_system"][0] == "Mean-field aligned"):
-        fig, axes = EBplotsMFA(dict)
-        st.session_state["Graph"] = fig
-        st.pyplot(fig)
+        figaxes = EBplotsMFA(dict)
+        st.session_state["Graph"] = figaxes
     return
 
 
