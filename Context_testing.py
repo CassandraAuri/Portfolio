@@ -142,8 +142,9 @@ def _mask_low_horizon(lon_map, lat_map, el_map, min_elevation, image=None):  # f
     return x, y, image_copy
 
 
-lon, lat, z = _mask_low_horizon(
+lon, lat, ignore = _mask_low_horizon(
     asi.skymap['lon'], asi.skymap['lat'], asi.skymap['el'], 10)
+
 gen = asi.animate_map_gen(overwrite=True, ax=ax[0], min_elevation=10)
 # magnetic_height=alt, magnetic_time=time_range[0])
 ##locations = [['themis', 'fsim'], ['trex_nir', 'rabb'], ['trex_nir', 'gill']]
@@ -151,7 +152,8 @@ gen = asi.animate_map_gen(overwrite=True, ax=ax[0], min_elevation=10)
 plots = []
 
 
-for i, (time, image, axes, im) in enumerate(gen):
+for i, (time, z, axes, im) in enumerate(gen):
+    print(np.shape(z))
 
     ax[1].clear()
     ax[2].clear()  # clears time series
